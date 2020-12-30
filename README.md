@@ -9,3 +9,6 @@ Get a users profile picture.
 Show information about my personal website [nburns.tech](https://nburns.tech) (top countries, # of attacks stopped with cloudflare, etc).  
 Get the most recent Justin Whang retweet/like. (lol)  
 Hold a repo of common reaction images I use.  
+Log everything (reactions, messages, voice channels etc).  
+
+# Installation (WIP)
