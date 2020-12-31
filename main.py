@@ -1,4 +1,3 @@
-from os import name
 import discord #duhhhh
 import asyncio 
 import logging #used for useful logging output (and checking for heartbeat)
@@ -8,6 +7,7 @@ from discord.colour import Color #used to make requests to various API endpoints
 from removebg import RemoveBg #API wrapper for removebg.com 
 from discord.ext import commands
 from datetime import datetime
+
 #setup logging
 logging.basicConfig(
     level = logging.INFO,
