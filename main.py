@@ -3,6 +3,7 @@ import asyncio
 import logging #used for useful logging output (and checking for heartbeat)
 import json #used for parsing config.json to avoid keys being leaked to github
 import aiohttp
+from discord import channel
 from discord.colour import Color #used to make requests to various API endpoints
 from removebg import RemoveBg #API wrapper for removebg.com 
 from discord.ext import commands
@@ -29,6 +30,16 @@ with open('config.json') as config_file:
 async def on_ready():
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{len(bot.guilds)} servers! with {len(bot.users)} users!"))
     print(f'Bot connected as {bot.user}')
+
+@bot.command(pass_context=True)
+async def pfp(ctx):
+    try:
+        pfp = ctx.message.mentions[0].avatar_url
+        embed=discord.Embed(title=f"{ctx.message.mentions[0]}'s avatar", color=Color.green())
+        embed.set_image(url=(pfp))
+        await ctx.send(embed=embed)
+    except IndexError:
+        await ctx.send("You must mention a user!")
 
 #send message to logging channel when a message is deleted
 @bot.event
@@ -61,6 +72,7 @@ async def on_message_edit(before, after):
     embed.add_field(name="User: ",value=before.author.mention)
     embed.add_field(name="Before: ",value=before.content)
     embed.add_field(name="After: ",value=after.content)
+    embed.add_field(name="Channel: ",value=after.channel.mention)
     embed.add_field(name="Date: ",value=after.created_at)
     await channel.send(embed=embed)
 
