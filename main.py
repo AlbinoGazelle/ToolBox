@@ -5,6 +5,8 @@ from discord import channel
 from discord.colour import Color #used to make requests to various API endpoints
 from discord.ext import commands
 from datetime import datetime
+import base64
+import requests
 
 #setup logging
 logging.basicConfig(
@@ -37,6 +39,32 @@ async def pfp(ctx):
         await ctx.send(embed=embed)
     except IndexError:
         await ctx.send("You must mention a user!")
+@bot.command(pass_context=True)
+async def vt(ctx):
+    try:
+        url = ctx.message.content[4:]
+        
+        urlBase64 = base64.b64encode(url.encode('ascii')).decode('ascii')
+        # print(urlBase64)
+        url = "https://www.virustotal.com/api/v3/urls/{BASE_64_URL}".format(BASE_64_URL=urlBase64)
+
+        headers = {
+
+           "Accept": "application/json",
+
+           "x-apikey": config['vt_api_key']
+
+        }
+
+        response = requests.request("GET", url, headers=headers)
+        jsonResponse = json.loads(response.text)
+        # print(jsonResponse)
+        last_analysis = jsonResponse["data"]['attributes']['last_analysis_stats']
+        flags = last_analysis['malicious'] + last_analysis['suspicious']
+        totalScans = last_analysis['malicious'] + last_analysis['suspicious'] + last_analysis['harmless']
+        await ctx.send("https://www.virustotal.com/gui/url/{BASE64_URL}".format(BASE64_URL=urlBase64) + "\n" + str(flags) + "/" + str(totalScans))
+    except:
+        await ctx.send("something went wrong")
 
 #send message to logging channel when a message is deleted
 @bot.event
