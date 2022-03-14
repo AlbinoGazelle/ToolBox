@@ -1,11 +1,8 @@
 import discord #duhhhh
-import asyncio 
 import logging #used for useful logging output (and checking for heartbeat)
 import json #used for parsing config.json to avoid keys being leaked to github
-import aiohttp
 from discord import channel
 from discord.colour import Color #used to make requests to various API endpoints
-from removebg import RemoveBg #API wrapper for removebg.com 
 from discord.ext import commands
 from datetime import datetime
 
@@ -28,7 +25,7 @@ with open('config.json') as config_file:
 #do stuff when the bot is ready
 @bot.event
 async def on_ready():
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{len(bot.guilds)} servers! with {len(bot.users)} users!"))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"👁️"))
     print(f'Bot connected as {bot.user}')
 
 @bot.command(pass_context=True)
@@ -88,7 +85,7 @@ async def on_reaction_add(reaction, user):
     )
     embed.add_field(name="User: ",value=user.mention)
     embed.add_field(name="Reaction: ",value=reaction.emoji)
-    embed.add_field(name="Channel: ",value=reaction.message.channel.mention)
+    embed.add_field(name="Channel: ",value=reaction.message.channel)
     embed.add_field(name="Message: ",value=reaction.message.content)
     await channel.send(embed=embed)
 
