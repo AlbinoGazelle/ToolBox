@@ -1,3 +1,4 @@
+from urllib import response
 import discord #duhhhh
 import logging #used for useful logging output (and checking for heartbeat)
 import json #used for parsing config.json to avoid keys being leaked to github
@@ -5,7 +6,8 @@ from discord import channel
 from discord.colour import Color #used to make requests to various API endpoints
 from discord.ext import commands
 from datetime import datetime
-
+import requests
+import hashlib
 #setup logging
 logging.basicConfig(
     level = logging.INFO,
@@ -38,6 +40,34 @@ async def pfp(ctx):
     except IndexError:
         await ctx.send("You must mention a user!")
 
+@bot.command(pass_context=True)
+async def vt(ctx):
+    try:
+        data = ctx.message.content.split()
+        data = hashlib.sha256(str.encode(data[1]))
+        url = f"https://www.virustotal.com/api/v3/urls/{data.hexdigest()}"
+        headers = {
+            "Accept" : "application/json",
+            "x-apikey" : config['vt']
+        }
+        response = requests.request("GET", url, headers=headers)
+        vt_data = response.json().get('data').get('attributes').get('last_analysis_stats')
+        embed = discord.Embed(
+            title = "VirusTotal Detection Rates",
+            color = Color.blue()
+        )
+        total_scans = int(vt_data.get('harmless')) + int(vt_data.get('malicious')) + int(vt_data.get('suspicious')) + int(vt_data.get('undetected'))
+        detection_rate = round(int(vt_data.get('malicious')) + int(vt_data.get('suspicious')) / total_scans, 2)
+        embed.add_field(name="Link:", value=f"https://www.virustotal.com/gui/url/{data.hexdigest()}")
+        embed.add_field(name="Harmless:", value=vt_data.get('harmless'))
+        embed.add_field(name="Malicious:", value=vt_data.get('malicious'))
+        embed.add_field(name="Suspicious:", value=vt_data.get('suspicious'))
+        embed.add_field(name="Undetected:", value=vt_data.get('undetected'))
+        embed.add_field(name="Total:", value=total_scans)
+        embed.add_field(name="Detection Rate:", value=f"{detection_rate}%")
+        await ctx.send(embed=embed)
+    except:
+        await ctx.send("You did something wrong, better error handling soontm")
 #send message to logging channel when a message is deleted
 @bot.event
 async def on_message_delete(message):
