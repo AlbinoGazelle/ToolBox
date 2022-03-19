@@ -7,7 +7,7 @@ from discord.colour import Color #used to make requests to various API endpoints
 from discord.ext import commands
 from datetime import datetime
 import requests
-import hashlib
+import asyncio
 import base64
 from urllib.parse import urlparse
 #setup logging
@@ -75,6 +75,7 @@ async def get_vt_url_info(url):
         "Accept" : "application/json",
         "x-apikey" : config['vt']
     }
+    print(f"getting info on {url}")
     response = requests.request("GET", url, headers=headers)
     return response
 
@@ -96,59 +97,68 @@ async def submit_url(url, data):
     response = requests.request("POST", url, headers=headers, data=data)
     return response
 
+async def craft_embed(data, url):
+    vt_data = data.json()["data"]['attributes']['last_analysis_stats']
+    #get total number of scans
+    total_scans = int(vt_data.get('harmless')) + int(vt_data.get('malicious')) + int(vt_data.get('suspicious')) + int(vt_data.get('undetected'))
+    #calculate detection rate
+    detection_rate = round(int(vt_data.get('malicious')) + int(vt_data.get('suspicious')) / total_scans, 2)
+    #change embed color if we have detections
+    if detection_rate > 0:
+        color = Color.red()
+    else:
+        color = Color.blue()
+        #craft embed and add fields
+    embed = discord.Embed(
+        title = "VirusTotal Detection Rates",
+        color = color
+    )
+    embed.set_thumbnail(url="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/VirusTotal_logo.svg/564px-VirusTotal_logo.svg.png")
+    embed.add_field(name="Link:", value=f"https://www.virustotal.com/gui/url/{url}")
+    embed.add_field(name="Harmless:", value=vt_data.get('harmless'))
+    embed.add_field(name="Malicious:", value=vt_data.get('malicious'))
+    embed.add_field(name="Suspicious:", value=vt_data.get('suspicious'))
+    embed.add_field(name="Undetected:", value=vt_data.get('undetected'))
+    embed.add_field(name="Total:", value=total_scans)
+    embed.add_field(name="Detection Rate:", value=f"{detection_rate}%")
+    datestring = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
+    embed.set_footer(text=f"{datestring}")
+    return embed
 @bot.command(pass_context=True)
 async def vt(ctx):
     normalized_url = ctx.message.content.split()
     base64Url = await get_url(normalized_url[1])
     url = f'https://www.virustotal.com/api/v3/urls/{base64Url}'
     response = await get_vt_url_info(url)
-    #try to get data, if errors means either:
-    #1. VT hasnt seen this URL or
-    #2. URL isnt valid
+    
     try:
-        #get last analysis stats if we've seen the URL before
-        vt_data = response.json()['data']['attributes']['last_analysis_stats']
-            #get total number of scans
-        total_scans = int(vt_data.get('harmless')) + int(vt_data.get('malicious')) + int(vt_data.get('suspicious')) + int(vt_data.get('undetected'))
-        #calculate detection rate
-        detection_rate = round(int(vt_data.get('malicious')) + int(vt_data.get('suspicious')) / total_scans, 2)
-        #change embed color if we have detections
-        if detection_rate > 0:
-            color = Color.red()
-        else:
-            color = Color.blue()
-        #craft embed and add fields
-        embed = discord.Embed(
-            title = "VirusTotal Detection Rates",
-            color = color
-        )
-        embed.set_image(url="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/VirusTotal_logo.svg/564px-VirusTotal_logo.svg.png")
-        embed.add_field(name="Link:", value=f"https://www.virustotal.com/gui/url/{base64Url}")
-        embed.add_field(name="Harmless:", value=vt_data.get('harmless'))
-        embed.add_field(name="Malicious:", value=vt_data.get('malicious'))
-        embed.add_field(name="Suspicious:", value=vt_data.get('suspicious'))
-        embed.add_field(name="Undetected:", value=vt_data.get('undetected'))
-        embed.add_field(name="Total:", value=total_scans)
-        embed.add_field(name="Detection Rate:", value=f"{detection_rate}%")
-        await ctx.send(embed=embed)
-    except KeyError as e:
-        await ctx.send(f"VirusTotal has not seen this URL. Submitting it now... please wait.")
-        vt_url = f"https://www.virustotal.com/api/v3/urls"
-        data = {'url': normalized_url[1]}
-        submitData = await submit_url(vt_url, data)
-        sleep(20)
-        print(submitData.text)
-        try:
-            if submitData.json()['error']['code'] == "InvalidArgumentError":
-                await ctx.send(f"Virustotal cannot process this URL! Check for typos! Reason: `{submitData.json()['error']['message']}`")
+        response.json()["error"]
+        if response.json()["error"]['code'] == 'NotFoundError':
+            await ctx.send("Submitting this to VT")
+            data = {'url': f"{normalized_url[1]}"}
+            submitData = await submit_url("https://www.virustotal.com/api/v3/urls", data)
+            await asyncio.sleep(20)
+            #print(f"submit data: {submitData.text}")
+            if submitData.json()["error"]["code"] == "InvalidArgumentError":
+                await ctx.send(f"URL {normalized_url[1]} cannot be processed. Check for typos!")
                 return
-            else:
-                await ctx.send(f"{ctx.author.mention} Analysis Complete!")
-                await vt(ctx)
-        except KeyError:
-            await ctx.send(f"{ctx.author.mention} Analysis Complete!")
             await vt(ctx)
-
+    except KeyError as e:
+        try:
+            if response.json()["error"]["code"] == "NotFoundError":
+                await ctx.send("URL Not Found. Retrying...")
+                await vt(ctx)
+                #print(f"This exists! {response.text}")
+        except:
+            vt_data = response.json()['data']['attributes']['last_analysis_stats']
+            total_scans = int(vt_data.get('harmless')) + int(vt_data.get('malicious')) + int(vt_data.get('suspicious')) + int(vt_data.get('undetected'))
+            if total_scans == 0:
+                #await ctx.send("VirusTotal is taking awhile to process this URL. Please wait. (This message will repeat)")
+                await asyncio.sleep(20)
+                await vt(ctx)
+            else:
+                embed = await craft_embed(response, base64Url)
+                await ctx.send(embed=embed)
 #send message to logging channel when a message is deleted
 @bot.event
 async def on_message_delete(message):
