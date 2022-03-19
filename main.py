@@ -10,6 +10,10 @@ import requests
 import asyncio
 import base64
 from urllib.parse import urlparse
+import os.path
+from zipfile import ZipFile
+import pyminizip
+import os
 #setup logging
 logging.basicConfig(
     level = logging.INFO,
@@ -97,6 +101,31 @@ async def submit_url(url, data):
     response = requests.request("POST", url, headers=headers, data=data)
     return response
 
+# Attempts to get file from hash using virus.exchange
+async def get_file_share(hash):
+    api_key = config['virus_share']
+    url = f"https://virus.exchange/api/file/{hash}/download"
+
+    headers = {
+        'accept' : 'application/octet-stream',
+        "Authorization" : f"Bearer {api_key}"
+    }
+    if os.path.exists(hash):
+        return False
+    else:
+        response = requests.request("GET", url, headers=headers)
+        if response.status_code != 200:
+            return True
+        with open(f"{hash}", "wb") as f:
+            f.write(response.content)
+        password = "infected"
+        #zipf file with password
+        pyminizip.compress(hash, None, f"{hash}.zip", password, 5)
+        #delete leftover file
+        os.remove(hash)
+
+        
+
 async def craft_embed(data, url):
     vt_data = data.json()["data"]['attributes']['last_analysis_stats']
     #get total number of scans
@@ -124,6 +153,7 @@ async def craft_embed(data, url):
     datestring = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
     embed.set_footer(text=f"{datestring}")
     return embed
+
 @bot.command(pass_context=True)
 async def vt(ctx):
     normalized_url = ctx.message.content.split()
@@ -159,6 +189,39 @@ async def vt(ctx):
             else:
                 embed = await craft_embed(response, base64Url)
                 await ctx.send(embed=embed)
+@bot.command(pass_context=True)
+async def get_file(ctx):
+    command = ctx.message.content.split()
+    file_hash = command[1]
+    help_commands = ['-h', '-help', '--help', '--h']
+    if command[1] in help_commands:
+        embed = discord.Embed(
+            title = "Get File",
+            color = Color.blue()
+        )
+        embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/793737282242084864/b7caaa589062a2ee0b5abed526e4f6b2.webp?size=1024")
+        embed.add_field(name="Information", value="Accepts a file hash and attempts to retrieve it from virus.exchange.", inline=False)
+        embed.add_field(name="Command Format", value="`?get_file $FILE_HASH`", inline=False)
+        embed.add_field(name="Supports", value="SHA1, SHA256, SHA512, and MD5")
+        embed.add_field(name="Zip Password", value="`infected`")
+        datestring = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
+        embed.set_footer(text=f"{datestring}")
+        await ctx.send(embed=embed)
+    else:
+        result = await get_file_share(file_hash)
+        if result == False:
+            #send zip
+            await ctx.send(file=discord.File(rf'{file_hash}.zip'))
+            #delete zip after sending
+            os.remove(f"{file_hash}.zip")
+            #await ctx.send("Test")
+        elif result == True:
+            await ctx.send("Not on Virus Exchange")
+        else:
+            #await ctx.send("Test")
+            await ctx.send(file=discord.File(rf'{file_hash}.zip'))
+            os.remove(f"{file_hash}.zip")
+
 #send message to logging channel when a message is deleted
 @bot.event
 async def on_message_delete(message):
