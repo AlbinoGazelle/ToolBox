@@ -220,9 +220,11 @@ async def get_file(ctx):
         else:
             #copy/paste for the lazy
             #note: only works for the mw samples channel in the csc server
-            await ctx.send(f"Copy me\n\n```wget https://cdn.discordapp.com/attachments/954017582262919238/964042213342449694/{file_hash}.zip; unzip -P infected {file_hash}.zip```")
+            
             #await ctx.send("Test")
-            await ctx.send(file=discord.File(rf'{file_hash}.zip'))
+            data = await ctx.send(file=discord.File(rf'{file_hash}.zip'))
+            discord_message_data = data.attachments[0]
+            await ctx.send(f"Copy me\n\n```wget {discord_message_data.url}; unzip -P infected {file_hash}.zip```")
             os.remove(f"{file_hash}.zip")
 
 #send message to logging channel when a message is deleted
