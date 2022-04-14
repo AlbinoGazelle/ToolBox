@@ -212,6 +212,9 @@ async def get_file(ctx):
         if result == False:
             #send zip
             await ctx.send(file=discord.File(rf'{file_hash}.zip'))
+            #copy/paste for the lazy
+            #note: only works for the mw samples channel in the csc server
+            await ctx.send(f"Copy me\n\n`wget https://cdn.discordapp.com/attachments/954017582262919238/964042213342449694/{file_hash}.zip; unzip -P infected {file_hash}.zip`")
             #delete zip after sending
             os.remove(f"{file_hash}.zip")
             #await ctx.send("Test")
