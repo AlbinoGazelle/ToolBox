@@ -14,6 +14,8 @@ import os.path
 from zipfile import ZipFile
 import pyminizip
 import os
+import tweepy
+
 #setup logging
 logging.basicConfig(
     level = logging.INFO,
@@ -23,7 +25,9 @@ logging.basicConfig(
 
 
 #init bot
-intents = discord.Intents.default()
+intents = discord.Intents.all()
+intents.members = True
+intents.reactions = True
 bot = commands.Bot(command_prefix='?', intents=intents)
 
 #parse config file for tokens and keys
@@ -36,6 +40,7 @@ async def on_ready():
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"👁️"))
     print(f'Bot connected as {bot.user}')
 
+    
 #validate urls
 def is_url(url):
   try:
@@ -220,8 +225,6 @@ async def get_file(ctx):
         else:
             #copy/paste for the lazy
             #note: only works for the mw samples channel in the csc server
-            
-            #await ctx.send("Test")
             data = await ctx.send(file=discord.File(rf'{file_hash}.zip'))
             discord_message_data = data.attachments[0]
             await ctx.send(f"Copy me\n\n```wget {discord_message_data.url}; unzip -P infected {file_hash}.zip```")
@@ -238,9 +241,24 @@ async def on_message_delete(message):
     )
     embed.add_field(name="User: ",value=message.author.mention)
     embed.add_field(name="Channel: ",value=message.channel.mention)
-    embed.add_field(name="Message: ", value=message.content)
+    if message.content:
+        embed.add_field(name="Message: ", value=message.content)
+    else:
+        embed.add_field(name="Message: ",value="Contained a sticker")
     embed.add_field(name="Date: ",value=message.created_at)
     await channel.send(embed=embed)
+
+#log when a user gains a role
+
+#log when a user loses a role
+
+#log when a new role is created
+
+#log when a user is server muted
+
+#log when a user is deafened
+
+#log when a user changes nicknames
 
 
 #send message to logging channel when a message is edited
@@ -275,9 +293,37 @@ async def on_reaction_add(reaction, user):
     embed.add_field(name="User: ",value=user.mention)
     embed.add_field(name="Reaction: ",value=reaction.emoji)
     embed.add_field(name="Channel: ",value=reaction.message.channel)
-    embed.add_field(name="Message: ",value=reaction.message.content)
+    embed.add_field(name="Message: ",value=reaction.message.jump_url)
+    embed.add_field(name="Date: ",value=reaction.message.created_at)
+    print(reaction.message.stickers)
     await channel.send(embed=embed)
 
+
+@bot.event
+async def on_member_update(before, after):
+    #set channel id for logging
+    channel = bot.get_channel(int(config['debug']))
+    embed = discord.Embed(
+        title = "Member Updated",
+        color = Color.purple() 
+    )
+    #check for nickname changes
+    if before.nick != after.nick:
+        embed.add_field(name="Member: ",value=after.mention)
+        embed.add_field(name="Old Nickname: ",value=before.nick)
+        embed.add_field(name="New Nickname: ",value=after.nick)
+        await channel.send(embed=embed)
+    #check for new roles added
+    if len(after.roles) > len(before.roles):
+        embed.add_field(name="Member: ",value=after.mention)
+        embed.add_field(name="New Role: ", value=list(set(after.roles) - set(before.roles)))
+        await channel.send(embed=embed)
+    #check for roles being removed
+    if len(after.roles) < len(before.roles):
+        embed.add_field(name="Member: ",value=after.mention)
+        embed.add_field(name="Role Removed: ", value=list(set(before.roles) - set(after.roles)))
+        await channel.send(embed=embed)
+    #embed.add_field(name="User: ",value=user.mention)
 
 #send message to logging channel when a user joins or leaves a voice channel
 @bot.event
